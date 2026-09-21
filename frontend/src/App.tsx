@@ -1141,7 +1141,56 @@ const LiveTracking = () => {
   // ---------------------------------------------------------
   // E-Challan
   // ---------------------------------------------------------
-  const EChallan = () => (
+ const EChallan = () => {
+  const [challanStatus, setChallanStatus] = useState('READY');
+  const [challanMessage, setChallanMessage] = useState('');
+  const [challanLoading, setChallanLoading] = useState(false);
+
+  const vehicleNumber = 'UP32AB5698';
+  const violationCode = 'SPEEDING';
+  const location = 'Prayagraj, Uttar Pradesh';
+  const evidenceUrl =
+    'https://example.com/evidence/UP32AB5698.jpg';
+
+  const generateChallan = async () => {
+    try {
+      setChallanLoading(true);
+      setChallanStatus('SUBMITTING');
+      setChallanMessage('');
+
+      const response = await api.challan({
+        plate_number: vehicleNumber,
+        violation_code: violationCode,
+        location,
+        evidence_url: evidenceUrl,
+      });
+
+      setChallanStatus(
+        response.status?.toUpperCase() || 'QUEUED'
+      );
+
+      setChallanMessage(
+        response.message ||
+          'Enforcement request accepted successfully.'
+      );
+    } catch (error: any) {
+      console.error(
+        'Challan generation failed:',
+        error
+      );
+
+      setChallanStatus('FAILED');
+
+      setChallanMessage(
+        error?.message ||
+          'Unable to submit challan request.'
+      );
+    } finally {
+      setChallanLoading(false);
+    }
+  };
+
+  return (
     <>
       <Header title="E-Challan Enforcement" />
 
@@ -1149,13 +1198,26 @@ const LiveTracking = () => {
         <h3>Automated Enforcement</h3>
 
         <div className="challan-info">
+
           <div>
             <label>Detected Vehicle</label>
-            <strong>UP32AB5698</strong>
+
+            <strong>
+              {vehicleNumber}
+            </strong>
+          </div>
+
+          <div>
+            <label>Violation</label>
+
+            <strong>
+              {violationCode}
+            </strong>
           </div>
 
           <div>
             <label>Detection Source</label>
+
             <strong>
               Multi-Camera ANPR
             </strong>
@@ -1163,22 +1225,87 @@ const LiveTracking = () => {
 
           <div>
             <label>System Status</label>
-            <strong className="status-online">
-              READY
+
+            <strong
+              className={
+                challanStatus === 'FAILED'
+                  ? ''
+                  : 'status-online'
+              }
+              style={{
+                color:
+                  challanStatus === 'FAILED'
+                    ? '#ff4d4f'
+                    : challanStatus === 'SUBMITTING'
+                    ? '#ffc857'
+                    : '#31d7a0',
+              }}
+            >
+              {challanStatus}
             </strong>
           </div>
+
         </div>
 
         <div className="notice">
-          E-Challan enforcement interface is
-          connected to the TRENETRA command center.
-          Violation verification and challan
-          submission will use the enforcement API.
+          <b>Violation Location:</b>{' '}
+          {location}
+          <br />
+
+          <b>Evidence:</b>{' '}
+          Enforcement evidence attached to the
+          request.
         </div>
+
+        <div
+          style={{
+            marginTop: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
+          }}
+        >
+          <button
+            onClick={generateChallan}
+            disabled={challanLoading}
+            style={{
+              padding: '12px 24px',
+              borderRadius: 8,
+              border: 'none',
+              background: challanLoading
+                ? '#29404d'
+                : '#31d7a0',
+              color: '#061014',
+              fontWeight: 700,
+              cursor: challanLoading
+                ? 'not-allowed'
+                : 'pointer',
+            }}
+          >
+            {challanLoading
+              ? 'SUBMITTING...'
+              : 'GENERATE CHALLAN'}
+          </button>
+
+          {challanMessage && (
+            <span
+              style={{
+                color:
+                  challanStatus === 'FAILED'
+                    ? '#ff4d4f'
+                    : '#9ab0bd',
+                fontSize: 13,
+              }}
+            >
+              {challanMessage}
+            </span>
+          )}
+        </div>
+
       </section>
     </>
   );
-
+};
   const content = {
   Dashboard: <Dashboard />,
   'Live Tracking': <LiveTracking />,
