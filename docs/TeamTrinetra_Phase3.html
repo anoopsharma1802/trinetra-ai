@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Team Trinetra AI - Phase 3 Submission</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; color: #102b49; font: 10.5pt Arial, sans-serif; line-height: 1.42; }
+  h1 { margin: 0; color: #114d7d; font-size: 25pt; text-align: center; }
+  h2 { margin: 3mm 0 2mm; color: #114d7d; font-size: 16pt; border-bottom: 2px solid #1a78aa; padding-bottom: 1mm; }
+  h3 { margin: 3mm 0 1mm; color: #114d7d; font-size: 12pt; }
+  .subtitle { text-align: center; font-size: 14pt; font-weight: bold; margin: 2mm 0 7mm; }
+  .meta, .matrix { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; }
+  .meta td { padding: 2mm; border-bottom: 1px solid #b8c9d6; }
+  .meta td:first-child { width: 34%; font-weight: bold; }
+  .box { border: 1px solid #c1d4e1; background: #f4f9fc; padding: 3mm; margin: 2mm 0 4mm; }
+  .matrix th { background: #174f7c; color: white; text-align: left; padding: 2mm; }
+  .matrix td { border: 1px solid #b8c9d6; padding: 1.8mm; vertical-align: top; }
+  .matrix tr:nth-child(even) td { background: #f6fafc; }
+  .page-break { page-break-before: always; }
+  ul { margin-top: 1mm; padding-left: 6mm; }
+  li { margin: 1mm 0; }
+  .small { font-size: 9pt; color: #40586e; }
+  .signature { height: 18mm; }
+</style>
+</head>
+<body>
+<h1>BBDITM INTERNAL HACKATHON - SIH 2026</h1>
+<div class="subtitle">PHASE 3 SUBMISSION - Prototype / MVP Demonstration</div>
+<table class="meta">
+<tr><td>Team ID</td><td>______________________________</td></tr>
+<tr><td>Team Name</td><td>Team Trinetra AI</td></tr>
+<tr><td>Team Leader, Members</td><td>______________________________</td></tr>
+<tr><td>Panel</td><td>______________________________</td></tr>
+<tr><td>Submission Date</td><td>22 September 2026</td></tr>
+</table>
+
+<h2>1. Core Functionality (10 marks)</h2>
+<div class="box"><b>Demo Video Link (backup):</b> ______________________________</div>
+<p>Trinetra AI is a citywide traffic intelligence prototype for ANPR, vehicle trajectory tracking, traffic analytics and intelligent enforcement.</p>
+<p>The demonstration starts with operator login and a command-center dashboard showing 10 demo cameras, detected vehicle events, open alerts, congestion index and a GIS map. A vehicle number can be entered in Live Tracking to retrieve its multi-camera trajectory. The route is displayed with road-following geometry, direction arrows, START and LATEST markers, and a camera timeline.</p>
+<p>An operator can add a registration number to the blacklist with a reason. When a blacklisted vehicle is detected through the ANPR workflow, the backend creates a high-severity alert, stores it, sends a WebSocket notification to connected dashboards and plays an alert beep. The prototype also includes ANPR event monitoring, uploaded video ANPR, traffic analytics and an E-Challan demonstration workflow.</p>
+
+<h2>2. UI/UX (5 marks)</h2>
+<p><b>Attach screenshots of:</b> Login, Dashboard, Live Tracking, Blacklist, Alert popup, Traffic Analytics and E-Challan.</p>
+<p>The interface uses a command-center layout so operators can scan important information quickly. Persistent sidebar navigation keeps workflows discoverable. Summary cards highlight active cameras, detections, alerts and congestion. Maps, direction markers and a timeline make vehicle movement easier to understand. Forms provide clear feedback for invalid input and duplicate blacklist entries. The layout supports smaller screens and light/dark themes.</p>
+
+<h2>3. Error Handling (5 marks)</h2>
+<table class="matrix"><tr><th>Test Case / Scenario</th><th>Expected Behavior</th><th>Actual Result</th></tr>
+<tr><td>Empty vehicle number</td><td>Reject invalid search</td><td>Search is safely ignored and page remains stable.</td></tr>
+<tr><td>Unknown vehicle number</td><td>Show no-data state</td><td>"No trajectory data found" message is displayed.</td></tr>
+<tr><td>Empty blacklist vehicle number</td><td>Reject submission</td><td>Validation message asks for a vehicle number.</td></tr>
+<tr><td>Duplicate blacklist vehicle</td><td>Do not create duplicate</td><td>Backend returns a duplicate-entry error.</td></tr>
+<tr><td>Missing camera/video</td><td>Do not start processing</td><td>Video workflow shows a clear validation message.</td></tr>
+<tr><td>Invalid login</td><td>Deny access without crash</td><td>Login error is shown.</td></tr>
+</table>
+
+<h2>4. Performance (5 marks)</h2>
+<p>The Vite production build completes in approximately 1-2 seconds on the development machine. Dashboard API requests are loaded in parallel. The prototype was tested with 10 cameras, 10 demo vehicles and five trajectory points per vehicle. WebSocket alerts are delivered to connected clients. Route arrows are limited to avoid visual overload. If routing or WebSocket services are unavailable, the UI keeps working with fallback/status behavior.</p>
+
+<div class="page-break"></div>
+<h2>5. Completeness (5 marks)</h2>
+<table class="matrix"><tr><th>Planned Feature</th><th>Status</th><th>Notes</th></tr>
+<tr><td>ANPR Dashboard</td><td>Done</td><td>Dashboard, cameras, events, alerts and analytics implemented.</td></tr>
+<tr><td>YOLO Plate Detection</td><td>Partial</td><td>Pipeline and model integrated; production tuning remains.</td></tr>
+<tr><td>OCR Plate Recognition</td><td>Partial</td><td>Integration exists; installed PaddleOCR API compatibility needs adjustment.</td></tr>
+<tr><td>Multi-Camera Tracking</td><td>Done</td><td>Five-point demo trajectories are available.</td></tr>
+<tr><td>Road-Based Route and Direction</td><td>Done</td><td>Road geometry, arrows, START and LATEST markers.</td></tr>
+<tr><td>Vehicle Blacklist and Alerts</td><td>Done</td><td>Add, remove, WebSocket popup and beep alert.</td></tr>
+<tr><td>GIS / Leaflet Dashboard</td><td>Done</td><td>Camera, route and congestion map implemented.</td></tr>
+<tr><td>Traffic Analytics</td><td>Done</td><td>Camera-wise events and congestion index implemented.</td></tr>
+<tr><td>E-Challan Workflow</td><td>Done</td><td>Demo enforcement submission and receipt implemented.</td></tr>
+<tr><td>10 Demo Cameras and Vehicles</td><td>Done</td><td>Seeded data supports jury demonstration.</td></tr>
+<tr><td>Vahan API</td><td>Not Done</td><td>Official authorization and credentials are required.</td></tr>
+<tr><td>Apache Kafka</td><td>Not Done</td><td>Planned for production real-time streaming.</td></tr>
+<tr><td>PostgreSQL / PostGIS</td><td>Partial</td><td>Architecture is ready; current demo uses SQLite.</td></tr>
+<tr><td>ByteTrack / DeepSORT</td><td>Partial</td><td>Integration structure exists; production deployment remains.</td></tr>
+<tr><td>Fake Plate Detection</td><td>Not Done</td><td>Planned next-phase feature.</td></tr>
+<tr><td>Production Security</td><td>Partial</td><td>Basic authentication exists; hardening remains.</td></tr>
+</table>
+
+<h3>Demonstration Vehicle Numbers</h3>
+<p class="small">UP32AB5698 | UP70CT2146 | DL01AB1234 | MH12DE1433 | TN10BQ1586 | RJ14CA7788 | KA01MN4567 | GJ05RT9087 | BR01DX2468 | WB06KQ1357</p>
+<h3>Signatures of Students</h3>
+<table class="meta"><tr><td class="signature">1. __________________________</td><td>2. __________________________</td></tr><tr><td class="signature">3. __________________________</td><td>4. __________________________</td></tr><tr><td class="signature">5. __________________________</td><td>6. __________________________</td></tr></table>
+<h3>Signatures of Judges</h3>
+<table class="meta"><tr><td class="signature">1. __________________________</td><td>2. __________________________</td></tr><tr><td class="signature">3. __________________________</td><td>4. __________________________</td></tr></table>
+</body>
+</html>

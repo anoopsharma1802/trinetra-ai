@@ -1,12 +1,49 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ...db.database import get_db
-from ...db.models import VehicleEvent, TrajectoryPoint as TrajectoryPointModel, Camera
-from ...schemas.api import VehicleEventOut, TrajectoryOut, TrajectoryPoint
+from ...db.models import VehicleBlacklist, VehicleEvent, TrajectoryPoint as TrajectoryPointModel, Camera
+from ...schemas.api import VehicleBlacklistIn, VehicleBlacklistOut, VehicleEventOut, TrajectoryOut, TrajectoryPoint
 from ...services.alert_engine import check_multi_camera_alert
 
 router = APIRouter()
+
+
+@router.get("/blacklist", response_model=list[VehicleBlacklistOut])
+def blacklist(db: Session = Depends(get_db)):
+    return db.query(VehicleBlacklist).order_by(VehicleBlacklist.created_at.desc()).all()
+
+
+@router.post("/blacklist", response_model=VehicleBlacklistOut, status_code=201)
+def add_to_blacklist(payload: VehicleBlacklistIn, db: Session = Depends(get_db)):
+    plate_number = payload.plate_number.strip().upper()
+    reason = payload.reason.strip() or "Manual review"
+
+    if not plate_number:
+        raise HTTPException(status_code=400, detail="Vehicle number is required")
+
+    existing = db.query(VehicleBlacklist).filter(VehicleBlacklist.plate_number == plate_number).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Vehicle is already blacklisted")
+
+    entry = VehicleBlacklist(plate_number=plate_number, reason=reason)
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+@router.delete("/blacklist/{plate_number}")
+def remove_from_blacklist(plate_number: str, db: Session = Depends(get_db)):
+    entry = db.query(VehicleBlacklist).filter(
+        VehicleBlacklist.plate_number == plate_number.strip().upper()
+    ).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Vehicle is not blacklisted")
+
+    db.delete(entry)
+    db.commit()
+    return {"status": "removed", "plate_number": plate_number.strip().upper()}
 
 
 @router.get("/events", response_model=list[VehicleEventOut])

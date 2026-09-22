@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from ..db.models import Alert, VehicleEvent
+from ..db.models import Alert, VehicleBlacklist, VehicleEvent
 from ..realtime.websocket import manager
 
 
@@ -41,6 +41,66 @@ async def check_multi_camera_alert(
             f"across {len(camera_ids)} cameras."
         ),
         plate_number=plate_number.upper(),
+        resolved=False,
+    )
+
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+
+    await manager.broadcast(
+        {
+            "type": "alert",
+            "alert": {
+                "id": alert.id,
+                "severity": alert.severity,
+                "title": alert.title,
+                "message": alert.message,
+                "plate_number": alert.plate_number,
+                "resolved": alert.resolved,
+                "created_at": alert.created_at.isoformat(),
+            },
+        }
+    )
+
+    return alert
+
+
+async def check_blacklist_alert(
+    db: Session,
+    plate_number: str,
+):
+    normalized_plate = plate_number.strip().upper()
+    entry = (
+        db.query(VehicleBlacklist)
+        .filter(VehicleBlacklist.plate_number == normalized_plate)
+        .first()
+    )
+
+    if entry is None:
+        return None
+
+    existing_alert = (
+        db.query(Alert)
+        .filter(
+            Alert.plate_number == normalized_plate,
+            Alert.title == "Blacklisted Vehicle Detected",
+            Alert.resolved == False,
+        )
+        .first()
+    )
+
+    if existing_alert:
+        return existing_alert
+
+    alert = Alert(
+        severity="high",
+        title="Blacklisted Vehicle Detected",
+        message=(
+            f"Vehicle {normalized_plate} matched the blacklist. "
+            f"Reason: {entry.reason}."
+        ),
+        plate_number=normalized_plate,
         resolved=False,
     )
 
