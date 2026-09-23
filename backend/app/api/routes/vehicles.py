@@ -5,6 +5,7 @@ from ...db.database import get_db
 from ...db.models import VehicleBlacklist, VehicleEvent, TrajectoryPoint as TrajectoryPointModel, Camera
 from ...schemas.api import VehicleBlacklistIn, VehicleBlacklistOut, VehicleEventOut, TrajectoryOut, TrajectoryPoint
 from ...services.alert_engine import check_multi_camera_alert
+from .cities import resolve_city
 
 router = APIRouter()
 
@@ -48,12 +49,20 @@ def remove_from_blacklist(plate_number: str, db: Session = Depends(get_db)):
 
 @router.get("/events", response_model=list[VehicleEventOut])
 def events(
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, ge=1, le=200),
+    page: int = Query(1, ge=1),
+    city: str | None = Query(default=None, max_length=80),
+    city_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
+    selected_city = resolve_city(db, city_id, city)
+    query = db.query(VehicleEvent)
+    if selected_city:
+        query = query.filter(VehicleEvent.city_id == selected_city.id)
     return (
-        db.query(VehicleEvent)
+        query
         .order_by(VehicleEvent.captured_at.desc())
+        .offset((page - 1) * limit)
         .limit(limit)
         .all()
     )
@@ -62,15 +71,19 @@ def events(
 @router.get("/{plate_number}/trajectory", response_model=TrajectoryOut)
 def trajectory(
     plate_number: str,
+    city: str | None = Query(default=None, max_length=80),
+    city_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    rows = (
+    selected_city = resolve_city(db, city_id, city)
+    query = (
         db.query(VehicleEvent, Camera)
         .join(Camera, VehicleEvent.camera_id == Camera.id)
         .filter(VehicleEvent.plate_number.ilike(plate_number))
-        .order_by(VehicleEvent.captured_at.asc())
-        .all()
     )
+    if selected_city:
+        query = query.filter(VehicleEvent.city_id == selected_city.id)
+    rows = query.order_by(VehicleEvent.captured_at.asc()).all()
 
     points = [
         TrajectoryPoint(

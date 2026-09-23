@@ -33,6 +33,7 @@ async def check_multi_camera_alert(
     if existing_alert:
         return existing_alert
 
+    latest_city = db.query(VehicleEvent.city).filter(VehicleEvent.plate_number.ilike(plate_number)).order_by(VehicleEvent.captured_at.desc()).scalar()
     alert = Alert(
         severity="medium",
         title="Multi-Camera Detection",
@@ -59,6 +60,7 @@ async def check_multi_camera_alert(
                 "plate_number": alert.plate_number,
                 "resolved": alert.resolved,
                 "created_at": alert.created_at.isoformat(),
+                "city_name": latest_city,
             },
         }
     )
@@ -93,6 +95,7 @@ async def check_blacklist_alert(
     if existing_alert:
         return existing_alert
 
+    latest_city = db.query(VehicleEvent.city).filter(VehicleEvent.plate_number == normalized_plate).order_by(VehicleEvent.captured_at.desc()).scalar()
     alert = Alert(
         severity="high",
         title="Blacklisted Vehicle Detected",
@@ -119,6 +122,7 @@ async def check_blacklist_alert(
                 "plate_number": alert.plate_number,
                 "resolved": alert.resolved,
                 "created_at": alert.created_at.isoformat(),
+                "city_name": latest_city,
             },
         }
     )

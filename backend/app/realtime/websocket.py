@@ -5,13 +5,12 @@ router = APIRouter()
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: list[WebSocket] = []
+        self.active_connections: dict[WebSocket, str | None] = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
 
-        if websocket not in self.active_connections:
-            self.active_connections.append(websocket)
+        self.active_connections[websocket] = None
 
         print(
             f"[WS] Connected. Active connections: "
@@ -19,8 +18,7 @@ class ConnectionManager:
         )
 
     def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+        self.active_connections.pop(websocket, None)
 
         print(
             f"[WS] Disconnected. Active connections: "
@@ -35,7 +33,10 @@ class ConnectionManager:
 
         dead_connections = []
 
-        for connection in list(self.active_connections):
+        message_city = message.get("city_name") or message.get("alert", {}).get("city_name")
+        for connection, subscribed_city in list(self.active_connections.items()):
+            if subscribed_city and message_city and subscribed_city != message_city:
+                continue
             try:
                 await connection.send_json(message)
                 print("[WS] Message sent successfully")
@@ -56,7 +57,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            await websocket.receive_text()
+            command = await websocket.receive_text()
+            if command.startswith("CITY:"):
+                manager.active_connections[websocket] = command.removeprefix("CITY:").strip() or None
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)

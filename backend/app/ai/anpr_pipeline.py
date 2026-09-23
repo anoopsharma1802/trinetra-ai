@@ -19,13 +19,25 @@ class ANPRPipeline:
 
     def process(self, frame):
         if self.detector is None:
-            from ultralytics import YOLO
+            try:
+                from ultralytics import YOLO
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Optional ANPR dependencies are not installed. Run: "
+                    "pip install ultralytics==8.3.40 paddleocr==2.9.1 paddlepaddle==2.6.2"
+                ) from exc
 
             model_path = Path(__file__).resolve().parents[2] / "models" / "plate_detector" / "best.pt"
             self.detector = YOLO(str(model_path))
 
         if self.ocr is None:
-            from paddleocr import PaddleOCR
+            try:
+                from paddleocr import PaddleOCR
+            except ImportError as exc:
+                raise RuntimeError(
+                    "Optional ANPR dependencies are not installed. Run: "
+                    "pip install ultralytics==8.3.40 paddleocr==2.9.1 paddlepaddle==2.6.2"
+                ) from exc
 
             self.ocr = PaddleOCR(
                 lang="en",

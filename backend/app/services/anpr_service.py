@@ -2,7 +2,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from ..db.models import VehicleEvent
+from ..db.models import Camera, VehicleEvent
 
 
 def save_anpr_detection(
@@ -26,6 +26,8 @@ def save_anpr_detection(
         longitude=float(longitude),
         captured_at=datetime.utcnow(),
         image_url=image_url,
+        city=db.query(Camera.city).filter(Camera.id == camera_id).scalar() or "Unassigned",
+        city_id=db.query(Camera.city_id).filter(Camera.id == camera_id).scalar(),
     )
 
     db.add(event)

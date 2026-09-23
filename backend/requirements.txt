@@ -7,8 +7,10 @@ pydantic==2.10.4
 pydantic-settings==2.7.0
 httpx==0.28.1
 opencv-python-headless==4.10.0.84
-ultralytics==8.3.40
-paddleocr==2.9.1
-paddlepaddle==2.6.2
 deep-sort-realtime==1.3.2
 aiokafka==0.12.0
+pytest==8.3.4
+
+# Optional ANPR runtime dependencies for full detection/OCR features.
+# Install separately on a machine with enough resources:
+# pip install ultralytics==8.3.40 paddleocr==2.9.1 paddlepaddle==2.6.2

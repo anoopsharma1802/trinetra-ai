@@ -4,7 +4,7 @@ from .core.config import settings
 from .api.router import api_router
 from .realtime.websocket import router as ws_router
 
-from .db.database import Base, SessionLocal, engine
+from .db.database import Base, SessionLocal, engine, ensure_city_columns
 from datetime import datetime, timedelta
 from sqlalchemy import func
 
@@ -18,8 +18,11 @@ app.include_router(api_router,prefix='/api/v1'); app.include_router(ws_router)
 @app.on_event('startup')
 def initialize_database():
 	Base.metadata.create_all(bind=engine)
+	ensure_city_columns()
 	db = SessionLocal()
 	try:
+		if not settings.seed_demo_data:
+			return
 		camera_count = db.query(Camera).count()
 		if camera_count < 10:
 			demo_cameras = [

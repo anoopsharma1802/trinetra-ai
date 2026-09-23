@@ -57,18 +57,27 @@ export const api = {
       operator_id: operatorId,
       access_key: accessKey,
     }),
+  copilotChat: (message: string, conversationId?: string) =>
+    post('/copilot/chat', {
+      message,
+      conversation_id: conversationId || null,
+    }),
   // Cameras
-  cameras: () => get('/cameras'),
+  cities: async () => {
+    const records = await get('/cities');
+    return { cities: records.map((city: any) => city.name), records };
+  },
+  cameras: (city?: string) => get(`/cameras${city ? `?city=${encodeURIComponent(city)}` : ''}`),
   analyzeVideo: uploadVideo,
 
   // ANPR / vehicle events
-  events: () => get('/vehicles/events'),
+  events: (city?: string) => get(`/vehicles/events${city ? `?city=${encodeURIComponent(city)}` : ''}`),
 
   // Traffic analytics
-  analytics: () => get('/analytics/summary'),
+  analytics: (city?: string) => get(`/analytics/summary${city ? `?city=${encodeURIComponent(city)}` : ''}`),
 
   // Alerts
-  alerts: () => get('/alerts'),
+  alerts: (city?: string) => get(`/alerts${city ? `?city=${encodeURIComponent(city)}` : ''}`),
 
   blacklist: () => get('/vehicles/blacklist'),
   addToBlacklist: (plate_number: string, reason: string) =>
@@ -87,8 +96,11 @@ export const api = {
     }),
 
   // Vehicle trajectory
-  trajectory: (plate: string) =>
-    get(`/vehicles/${encodeURIComponent(plate)}/trajectory`),
+  trajectory: (plate: string, city?: string) =>
+    get(`/vehicles/${encodeURIComponent(plate)}/trajectory${city ? `?city=${encodeURIComponent(city)}` : ''}`),
+
+  vehicleIntelligence: (plate: string, cityId?: number) =>
+    get(`/vehicles/${encodeURIComponent(plate)}/intelligence${cityId ? `?city_id=${cityId}` : ''}`),
 
   // E-Challan
   challan: (data: {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
   MapContainer,
@@ -7,6 +7,7 @@ import {
   Marker,
   Polyline,
   Popup,
+  useMap,
 } from 'react-leaflet';
 import { divIcon } from 'leaflet';
 import { api } from './api';
@@ -32,7 +33,19 @@ function routeArrowIcon(angle: number, label: string) {
   });
 }
 
-function MapView({ cameras, route }: any) {
+function MapViewport({ center }: { center?: [number, number] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (center) {
+      map.setView(center, 13);
+    }
+  }, [center, map]);
+
+  return null;
+}
+
+function MapView({ cameras, route, center }: any) {
   const [roadRoute, setRoadRoute] = useState(route);
   const routeKey = JSON.stringify(route || []);
 
@@ -69,11 +82,12 @@ function MapView({ cameras, route }: any) {
   return (
     <div className="map">
       <MapContainer
-        center={[25.435, 81.852]}
+        center={center || [25.435, 81.852]}
         zoom={13}
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <MapViewport center={center} />
 
         {cameras.map((c: any) => (
           <CircleMarker
@@ -139,6 +153,10 @@ function MapView({ cameras, route }: any) {
 export default function App() {
   const [page, setPage] = useState('Dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
+  const [cities, setCities] = useState<string[]>([]);
+  const [cityDataLoading, setCityDataLoading] = useState(false);
+  const [cityDataError, setCityDataError] = useState('');
 
   const [authenticated, setAuthenticated] = useState(
     () => sessionStorage.getItem('trinetra-authenticated') === 'true'
@@ -159,6 +177,9 @@ export default function App() {
 
   const [trackingLoading, setTrackingLoading] =
     useState(false);
+  const [intelligenceLoading, setIntelligenceLoading] = useState(false);
+  const [intelligenceError, setIntelligenceError] = useState('');
+  const [vehicleIntelligence, setVehicleIntelligence] = useState<any>(null);
 
   const [d, setD] = useState<any>({
     cameras: [],
@@ -181,6 +202,18 @@ export default function App() {
   const [blacklistReason, setBlacklistReason] = useState('Manual review');
   const [blacklistLoading, setBlacklistLoading] = useState(false);
   const [blacklistMessage, setBlacklistMessage] = useState('');
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  const [copilotInput, setCopilotInput] = useState('');
+  const [copilotLoading, setCopilotLoading] = useState(false);
+  const [copilotMessages, setCopilotMessages] = useState<any[]>([
+    {
+      role: 'assistant',
+      content: 'Namaste. I can help with vehicle history, detections, camera timeline, and blacklist checks using authorized database records only.',
+      time: new Date().toISOString(),
+    },
+  ]);
+  const [copilotFailedMessage, setCopilotFailedMessage] = useState('');
+  const copilotMessagesRef = useRef<HTMLDivElement | null>(null);
 
   /* =====================================================
      THEME
@@ -195,6 +228,13 @@ export default function App() {
     );
   }, [theme]);
 
+  useEffect(() => {
+    copilotMessagesRef.current?.scrollTo({
+      top: copilotMessagesRef.current.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, [copilotMessages, copilotLoading]);
+
   /* =====================================================
      INITIAL API DATA
   ===================================================== */
@@ -205,11 +245,28 @@ export default function App() {
     }
 
     Promise.all([
-      api.cameras(),
-      api.events(),
-      api.analytics(),
-      api.alerts(),
-      api.trajectory('UP32AB5698'),
+      api.cities(),
+    ])
+      .then(([cityResponse]) => {
+        setCities(cityResponse.cities || []);
+      })
+      .catch((error) => console.error('City list loading failed:', error));
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (!authenticated) {
+      return;
+    }
+
+    const city = selectedCity || undefined;
+    setCityDataLoading(true);
+    setCityDataError('');
+    Promise.all([
+      api.cameras(city),
+      api.events(city),
+      api.analytics(city),
+      api.alerts(city),
+      api.trajectory('UP32AB5698', city),
       api.blacklist(),
     ])
       .then(
@@ -232,12 +289,15 @@ export default function App() {
         }
       )
       .catch((error) => {
+        setD((previous: any) => ({ ...previous, cameras: [], events: [], analytics: {}, alerts: [], trajectory: null }));
+        setCityDataError(error.message || 'City data could not be loaded.');
         console.error(
           'Initial API loading failed:',
           error
         );
-      });
-  }, [authenticated]);
+      })
+      .finally(() => setCityDataLoading(false));
+  }, [authenticated, selectedCity]);
 
   /* =====================================================
      REAL-TIME WEBSOCKET
@@ -266,7 +326,7 @@ export default function App() {
 
       socket.onopen = () => {
         setWsStatus('CONNECTED');
-        socket?.send('HQ_CONNECTED');
+        socket?.send(selectedCity ? `CITY:${selectedCity}` : 'HQ_CONNECTED');
       };
 
       socket.onmessage = (event) => {
@@ -315,7 +375,7 @@ export default function App() {
       }
       socket?.close();
     };
-  }, [authenticated]);
+  }, [authenticated, selectedCity]);
 
   useEffect(() => {
     if (!liveAlert) {
@@ -354,6 +414,13 @@ export default function App() {
       p.longitude,
     ]) || [];
 
+  const mapCenter = d.cameras.length
+    ? [
+        d.cameras.reduce((sum: number, camera: any) => sum + camera.latitude, 0) / d.cameras.length,
+        d.cameras.reduce((sum: number, camera: any) => sum + camera.longitude, 0) / d.cameras.length,
+      ]
+    : undefined;
+
   /* =====================================================
      HEADER
   ===================================================== */
@@ -370,6 +437,15 @@ export default function App() {
         </small>
 
         <h1>{title}</h1>
+        <label className="city-filter">
+          <span>DATABASE CITY</span>
+          <select value={selectedCity} onChange={(event) => setSelectedCity(event.target.value)}>
+            <option value="">All cities</option>
+            {cities.map((city) => <option key={city} value={city}>{city}</option>)}
+          </select>
+        </label>
+        {cityDataLoading && <small className="city-loading">Loading city data...</small>}
+        {cityDataError && <small className="city-error">{cityDataError}</small>}
       </div>
 
       <div className="header-actions">
@@ -507,6 +583,7 @@ export default function App() {
           <MapView
             cameras={d.cameras}
             route={route}
+            center={mapCenter}
           />
         </div>
 
@@ -617,7 +694,8 @@ export default function App() {
 
         const trajectory =
           await api.trajectory(
-            plate
+            plate,
+            selectedCity || undefined
           );
 
         setD(
@@ -640,6 +718,21 @@ export default function App() {
         );
       } finally {
         setTrackingLoading(false);
+      }
+    };
+
+    const verifyVehicle = async () => {
+      const plate = trackingPlate.trim().toUpperCase();
+      if (!plate) return;
+      try {
+        setIntelligenceLoading(true);
+        setIntelligenceError('');
+        setVehicleIntelligence(await api.vehicleIntelligence(plate));
+      } catch (error: any) {
+        setVehicleIntelligence(null);
+        setIntelligenceError(error.message || 'Vehicle intelligence lookup failed.');
+      } finally {
+        setIntelligenceLoading(false);
       }
     };
 
@@ -682,8 +775,39 @@ export default function App() {
                 ? 'TRACKING...'
                 : 'TRACK VEHICLE'}
             </button>
+            <button
+              className="quiet-button"
+              onClick={verifyVehicle}
+              disabled={intelligenceLoading}
+            >
+              {intelligenceLoading ? 'VERIFYING...' : 'VERIFY VEHICLE'}
+            </button>
           </div>
+          {intelligenceError && <div className="notice error-notice">{intelligenceError}</div>}
         </section>
+
+        {vehicleIntelligence && (
+          <section className="intelligence-grid">
+            <div className="panel intelligence-card">
+              <h3>Vehicle Verification <i>{vehicleIntelligence.vehicle_verification.is_demo ? 'DEMO' : 'LIVE'}</i></h3>
+              <strong>{vehicleIntelligence.plate_number}</strong>
+              <p>Status: {vehicleIntelligence.vehicle_verification.status}</p>
+              <small>Source: {vehicleIntelligence.vehicle_verification.source}</small>
+            </div>
+            <div className="panel intelligence-card">
+              <h3>Stolen Vehicle Status <i>{vehicleIntelligence.stolen_status.is_demo ? 'DEMO' : 'AUTHORIZED'}</i></h3>
+              <strong>{vehicleIntelligence.stolen_status.status}</strong>
+              <p>Source: {vehicleIntelligence.stolen_status.source}</p>
+              <small>Demo data is not a police or government determination.</small>
+            </div>
+            <div className="panel intelligence-card">
+              <h3>Audit Reference</h3>
+              <strong>{vehicleIntelligence.audit_reference}</strong>
+              <p>{vehicleIntelligence.trajectory.length} observed events</p>
+              <small>Only authorized database fields are displayed.</small>
+            </div>
+          </section>
+        )}
 
         <section className="stats">
           <div className="card">
@@ -764,6 +888,7 @@ export default function App() {
               <MapView
                 cameras={d.cameras}
                 route={route}
+                center={mapCenter}
               />
             ) : (
               <div className="notice">
@@ -2068,6 +2193,54 @@ export default function App() {
     setAuthenticated(false);
     setPage('Dashboard');
   };
+  const sendCopilotMessage = async (messageOverride?: string) => {
+    const text = (messageOverride ?? copilotInput).trim();
+    if (!text || copilotLoading) return;
+
+    const userMessage = {
+      role: 'user',
+      content: text,
+      time: new Date().toISOString(),
+    };
+    setCopilotMessages((previous) => [...previous, userMessage]);
+    setCopilotInput('');
+    setCopilotLoading(true);
+    setCopilotFailedMessage('');
+
+    try {
+      const response = await api.copilotChat(text);
+      const assistantMessage = {
+        role: 'assistant',
+        content: response.answer || 'Database mein is request ke liye sufficient records available nahi hain.',
+        time: new Date().toISOString(),
+        data: response.data,
+      };
+      setCopilotMessages((previous) => [...previous, assistantMessage]);
+    } catch (error: any) {
+      setCopilotMessages((previous) => [
+        ...previous,
+        {
+          role: 'assistant',
+          content: error?.message || 'AI Copilot is temporarily unavailable. Please retry after a moment.',
+          time: new Date().toISOString(),
+        },
+      ]);
+      setCopilotFailedMessage(text);
+    } finally {
+      setCopilotLoading(false);
+    }
+  };
+
+  const openCopilotTrajectory = async (plate: string) => {
+    setTrackingPlate(plate);
+    setPage('Live Tracking');
+    try {
+      const trajectory = await api.trajectory(plate, selectedCity || undefined);
+      setD((previous: any) => ({ ...previous, trajectory }));
+    } catch (error) {
+      console.error('Copilot trajectory opening failed:', error);
+    }
+  };
 
   if (!authenticated) {
     return (
@@ -2245,6 +2418,115 @@ export default function App() {
       ================================================= */}
 
       <main>{content}</main>
+      <div className="copilot-shell">
+        {!copilotOpen ? (
+          <button
+            type="button"
+            className="copilot-toggle"
+            onClick={() => setCopilotOpen(true)}
+          >
+            <span>✦</span>
+            Trinetra AI Copilot
+          </button>
+        ) : (
+          <div className="copilot-panel">
+            <div className="copilot-header">
+              <div>
+                <strong>Trinetra AI Copilot</strong>
+                <small>Intelligent Vehicle Investigation Assistant</small>
+              </div>
+              <button type="button" className="copilot-close" onClick={() => setCopilotOpen(false)}>
+                ×
+              </button>
+            </div>
+
+            <div className="copilot-quick-actions">
+              {['Vehicle History', 'Last Seen', 'Camera Timeline', 'Blacklist Status'].map((label) => (
+                <button key={label} type="button" onClick={() => sendCopilotMessage(label)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="copilot-messages" ref={copilotMessagesRef}>
+              {copilotMessages.map((message: any, index: number) => (
+                <div key={`${message.time}-${index}`} className={`copilot-message ${message.role}`}>
+                  <div className="copilot-avatar">{message.role === 'user' ? 'U' : 'AI'}</div>
+                  <div className="copilot-bubble">
+                    <p>{message.content}</p>
+                    {message.data?.events?.length ? (
+                      <ul>
+                        {message.data.events.slice(0, 3).map((event: any) => (
+                          <li key={event.id}>
+                            {event.camera_name} · {new Date(event.captured_at).toLocaleString()}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {message.data?.vehicle_number && message.data?.events?.length ? (
+                      <button
+                        type="button"
+                        className="copilot-map-action"
+                        onClick={() => void openCopilotTrajectory(message.data.vehicle_number)}
+                      >
+                        Open observed trajectory
+                      </button>
+                    ) : null}
+                    <small>{new Date(message.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
+                  </div>
+                </div>
+              ))}
+              {copilotLoading && (
+                <div className="copilot-message assistant">
+                  <div className="copilot-avatar">AI</div>
+                  <div className="copilot-bubble typing">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              )}
+              {copilotFailedMessage && !copilotLoading && (
+                <button
+                  type="button"
+                  className="copilot-retry"
+                  onClick={() => void sendCopilotMessage(copilotFailedMessage)}
+                >
+                  Retry last request
+                </button>
+              )}
+            </div>
+
+            <div className="copilot-input-row">
+              <textarea
+                value={copilotInput}
+                rows={1}
+                onChange={(event) => setCopilotInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    void sendCopilotMessage();
+                  }
+                }}
+                placeholder="Ask about a vehicle, camera, or blacklist status..."
+              />
+              <button type="button" className="primary-button" onClick={() => void sendCopilotMessage()} disabled={copilotLoading}>
+                Send
+              </button>
+            </div>
+            <button
+              type="button"
+              className="copilot-clear"
+              onClick={() => {
+                setCopilotMessages([]);
+                setCopilotFailedMessage('');
+              }}
+            >
+              Clear conversation
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

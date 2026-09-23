@@ -1,7 +1,7 @@
 ﻿from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from ...db.database import get_db
 from .auth import verify_access_token
 from ...db.models import Camera
 from ...schemas.api import CameraOut
+from .cities import resolve_city
 from ...services.alert_engine import check_blacklist_alert
 from ...services.anpr_service import save_anpr_detection
 
@@ -19,8 +20,18 @@ bearer = HTTPBearer(auto_error=False)
 
 
 @router.get("", response_model=list[CameraOut])
-def list_cameras(db: Session = Depends(get_db)):
-    return db.query(Camera).order_by(Camera.id).all()
+def list_cameras(city: str | None = Query(default=None, max_length=80), city_id: str | None = Query(default=None), db: Session = Depends(get_db)):
+    selected_city = resolve_city(db, city_id, city)
+    query = db.query(Camera)
+    if selected_city:
+        query = query.filter(Camera.city_id == selected_city.id)
+    return query.order_by(Camera.id).all()
+
+
+@router.get("/cities")
+def list_camera_cities(db: Session = Depends(get_db)):
+    stored = {row[0] for row in db.query(Camera.city).distinct().all() if row[0]}
+    return {"cities": sorted(stored)}
 
 
 @router.post("/video/analyze")

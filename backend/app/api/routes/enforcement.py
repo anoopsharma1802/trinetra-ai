@@ -1,11 +1,12 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ...db.database import get_db
 from ...db.models import Challan
+from .cities import resolve_city
 
 router = APIRouter()
 
@@ -15,6 +16,16 @@ class ChallanRequest(BaseModel):
     violation_code: str
     location: str
     evidence_url: str | None = None
+    city: str | None = None
+
+
+@router.get("/violations")
+def violations(city: str | None = Query(default=None), city_id: str | None = Query(default=None), db: Session = Depends(get_db)):
+    selected_city = resolve_city(db, city_id, city)
+    query = db.query(Challan)
+    if selected_city:
+        query = query.filter(Challan.city == selected_city.name)
+    return query.order_by(Challan.created_at.desc()).limit(200).all()
 
 
 @router.post("/challan")
@@ -31,6 +42,7 @@ def challan(
         plate_number=payload.plate_number,
         violation_code=payload.violation_code,
         location=payload.location,
+        city=payload.city,
         evidence_url=payload.evidence_url,
         status="queued",
     )

@@ -8,8 +8,12 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/trinetra
-      CORS_ORIGINS: http://localhost:5173
+      CORS_ORIGINS: '["http://localhost:5173"]'
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      COPILOT_MODEL: ${COPILOT_MODEL:-gemini-3.6-flash}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
     ports: ["8000:8000"]
     depends_on: [db,kafka]
   frontend:

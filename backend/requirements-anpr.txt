@@ -1,0 +1,4 @@
+# Optional full ANPR/OCR runtime for vehicle detection and plate recognition.
+ultralytics==8.3.40
+paddleocr==3.2.0
+paddlepaddle==3.2.2

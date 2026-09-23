@@ -27,7 +27,7 @@ def _sign(payload: str) -> str:
 
 def create_access_token(operator_id: str) -> str:
     payload = base64.urlsafe_b64encode(
-        json.dumps({"sub": operator_id, "exp": int(time.time()) + 28800}).encode()
+        json.dumps({"sub": operator_id, "role": "SUPER_ADMIN", "city_ids": "all", "exp": int(time.time()) + 28800}).encode()
     ).decode()
     return f"{payload}.{_sign(payload)}"
 
@@ -41,6 +41,19 @@ def verify_access_token(token: str) -> bool:
         return int(data["exp"]) > int(time.time())
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         return False
+
+
+def token_context(token: str) -> dict:
+    try:
+        payload, signature = token.split(".", 1)
+        if not hmac.compare_digest(signature, _sign(payload)):
+            return {}
+        data = json.loads(base64.urlsafe_b64decode(payload).decode())
+        if int(data["exp"]) <= int(time.time()):
+            return {}
+        return data
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return {}
 
 
 @router.post("/login")
